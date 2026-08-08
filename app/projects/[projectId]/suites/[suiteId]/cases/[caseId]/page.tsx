@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Plus, Trash2, Save, Archive, ArrowLeft } from "lucide-react"
+import { Plus, Trash2, Save, Archive, ArrowLeft, Play } from "lucide-react"
 import { useAppState } from "@/lib/app-state"
 import { AppShell } from "@/components/shell/app-shell"
 import { PageHeader } from "@/components/shell/page-header"
@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
+import { RunConfirmDialog } from "@/components/runs/run-confirm-dialog"
 import { CATEGORY_LABELS, SOURCE_LABELS, METRIC_LABELS } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -76,13 +77,20 @@ function emptyCase(suiteId: string): TestCase {
 export default function TestCaseEditorPage() {
   const params = useParams<{ projectId: string; suiteId: string; caseId: string }>()
   const router = useRouter()
-  const { testCases, auth, saveTestCase, archiveTestCase } = useAppState()
+  const { project, testCases, auth, saveTestCase, archiveTestCase, startCaseRun } = useAppState()
   const readOnly = auth.role !== "QA"
   const isNew = params.caseId === "new"
 
   const existing = isNew ? null : testCases.find((c) => c.id === params.caseId)
   const [form, setForm] = React.useState<TestCase>(existing ?? emptyCase(params.suiteId))
   const [archiveOpen, setArchiveOpen] = React.useState(false)
+  const [runOpen, setRunOpen] = React.useState(false)
+
+  function handleConfirmRun() {
+    startCaseRun(params.suiteId, form.id)
+    toast.success("Run testcase đã được xếp hàng")
+    router.push(`/projects/${params.projectId}/runs/latest`)
+  }
 
   if (!isNew && !existing) {
     return (
@@ -146,10 +154,18 @@ export default function TestCaseEditorPage() {
           )
         }
         action={
-          <Button variant="outline" onClick={() => router.push(`/projects/${params.projectId}/suites/${params.suiteId}`)}>
-            <ArrowLeft data-icon="inline-start" />
-            Quay lại
-          </Button>
+          <div className="flex items-center gap-2">
+            {!readOnly && !isNew && (
+              <Button variant="outline" onClick={() => setRunOpen(true)}>
+                <Play data-icon="inline-start" />
+                Chạy testcase
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => router.push(`/projects/${params.projectId}/suites/${params.suiteId}`)}>
+              <ArrowLeft data-icon="inline-start" />
+              Quay lại
+            </Button>
+          </div>
         }
       />
 
@@ -424,6 +440,18 @@ export default function TestCaseEditorPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {!isNew && (
+        <RunConfirmDialog
+          open={runOpen}
+          onOpenChange={setRunOpen}
+          mode="case"
+          name={form.title || "Testcase"}
+          activeCaseCount={1}
+          targetConfigVersion={project.target.currentVersion}
+          onConfirm={handleConfirmRun}
+        />
+      )}
     </AppShell>
   )
 }
