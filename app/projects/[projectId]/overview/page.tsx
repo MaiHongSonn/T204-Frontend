@@ -223,14 +223,16 @@ export default function OverviewPage() {
                 </Badge>
               </div>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-fit"
-              render={<Link href={`/projects/${project.id}/reports/case-run-001`} />}
-            >
-              Xem report
-            </Button>
+            {latestRun && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                render={<Link href={`/projects/${project.id}/reports/${latestRun.id}`} />}
+              >
+                Xem report
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
