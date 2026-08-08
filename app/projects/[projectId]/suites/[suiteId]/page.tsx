@@ -37,6 +37,7 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
+import { RunConfirmDialog } from "@/components/runs/run-confirm-dialog"
 import { CATEGORY_LABELS, SOURCE_LABELS } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -58,8 +59,12 @@ const outcomeIcon: Record<string, React.ComponentType<{ className?: string }>> =
 export default function SuiteDetailPage() {
   const params = useParams<{ projectId: string; suiteId: string }>()
   const router = useRouter()
-  const { project, testCases, auth, archiveTestCase, startSuiteRun } = useAppState()
+  const { project, testCases, auth, archiveTestCase, startSuiteRun, startCaseRun } = useAppState()
   const readOnly = auth.role !== "QA"
+
+  const [runDialog, setRunDialog] = React.useState<
+    { mode: "suite" } | { mode: "case"; caseId: string; caseTitle: string } | null
+  >(null)
 
   const suite = project.suites.find((s) => s.id === params.suiteId)
   const suiteCases = testCases.filter((c) => c.suiteId === params.suiteId && !c.archived)
@@ -78,10 +83,16 @@ export default function SuiteDetailPage() {
     )
   }
 
-  function handleRunSuite() {
-    startSuiteRun(suite!.id)
-    toast.success("Run suite đã được xếp hàng")
-    router.push(`/projects/${params.projectId}/runs/${suite!.id}/latest`)
+  function handleConfirmRun() {
+    if (!runDialog) return
+    if (runDialog.mode === "suite") {
+      startSuiteRun(suite!.id)
+      toast.success("Run suite đã được xếp hàng")
+    } else {
+      startCaseRun(suite!.id, runDialog.caseId)
+      toast.success("Run testcase đã được xếp hàng")
+    }
+    router.push(`/projects/${params.projectId}/runs/latest`)
   }
 
   return (
@@ -97,7 +108,7 @@ export default function SuiteDetailPage() {
                 <Sparkles data-icon="inline-start" />
                 Sinh testcase
               </Button>
-              <Button onClick={handleRunSuite} disabled={suiteCases.length === 0}>
+              <Button onClick={() => setRunDialog({ mode: "suite" })} disabled={suiteCases.length === 0}>
                 <Play data-icon="inline-start" />
                 Chạy suite
               </Button>
@@ -219,6 +230,12 @@ export default function SuiteDetailPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuGroup>
                                   <DropdownMenuItem
+                                    onClick={() => setRunDialog({ mode: "case", caseId: tc.id, caseTitle: tc.title })}
+                                  >
+                                    <Play data-icon="inline-start" className="size-3.5" />
+                                    Chạy testcase
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
                                     onClick={() => router.push(`/projects/${params.projectId}/suites/${suite.id}/cases/${tc.id}`)}
                                   >
                                     Sửa testcase
@@ -294,6 +311,16 @@ export default function SuiteDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <RunConfirmDialog
+        open={!!runDialog}
+        onOpenChange={(open) => !open && setRunDialog(null)}
+        mode={runDialog?.mode ?? "suite"}
+        name={runDialog?.mode === "case" ? runDialog.caseTitle : suite.name}
+        activeCaseCount={runDialog?.mode === "case" ? 1 : suiteCases.length}
+        targetConfigVersion={project.target.currentVersion}
+        onConfirm={handleConfirmRun}
+      />
     </AppShell>
   )
 }

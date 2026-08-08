@@ -428,10 +428,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const startSuiteRun = React.useCallback(
-    (suiteId: string) => {
-      const suiteCases = testCases.filter((c) => c.suiteId === suiteId && !c.archived).slice(0, 20)
+  const startRun = React.useCallback(
+    (suiteId: string, casesToRun: TestCase[]) => {
       const runId = `run-${Date.now()}`
+      const isSingleCase = casesToRun.length === 1
       const newRun: SuiteRun = {
         id: runId,
         suiteId,
@@ -440,7 +440,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         targetConfigVersion: project.target.currentVersion,
         requirementVersion: project.requirement.currentVersion,
         requirementQuality: project.requirement.quality,
-        cases: suiteCases.map((tc) => ({
+        cases: casesToRun.map((tc) => ({
           caseId: tc.id,
           caseTitle: tc.title,
           category: tc.category,
@@ -449,10 +449,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           ruleResults: [],
           metricResults: [],
         })),
-        timeline: [{ label: "Run được xếp hàng", timestamp: nowIso() }],
+        timeline: [
+          {
+            label: isSingleCase ? "Run 1 testcase được xếp hàng" : "Run được xếp hàng",
+            timestamp: nowIso(),
+          },
+        ],
       }
       setActiveRun(newRun)
-      pushActivity(`Run mới cho suite đã được xếp hàng`)
+      pushActivity(isSingleCase ? `Run cho 1 testcase đã được xếp hàng` : `Run mới cho suite đã được xếp hàng`)
 
       window.setTimeout(() => {
         setActiveRun((prev) =>
@@ -470,7 +475,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         )
       }, 1400)
 
-      suiteCases.forEach((tc, i) => {
+      casesToRun.forEach((tc, i) => {
         window.setTimeout(() => {
           setActiveRun((prev) => {
             if (!prev || prev.id !== runId) return prev
@@ -500,21 +505,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             setProject((p) => ({ ...p, runs: [finished, ...p.runs] }))
             return finished
           })
-          pushActivity("Run suite đã hoàn tất")
+          pushActivity(isSingleCase ? "Run testcase đã hoàn tất" : "Run suite đã hoàn tất")
         },
-        1800 + suiteCases.length * 900 + 600,
+        1800 + casesToRun.length * 900 + 600,
       )
+
+      return runId
     },
-    [testCases, project.target.currentVersion, project.requirement.currentVersion, project.requirement.quality, pushActivity],
+    [project.target.currentVersion, project.requirement.currentVersion, project.requirement.quality, pushActivity],
+  )
+
+  const startSuiteRun = React.useCallback(
+    (suiteId: string) => {
+      const suiteCases = testCases.filter((c) => c.suiteId === suiteId && !c.archived).slice(0, 20)
+      startRun(suiteId, suiteCases)
+    },
+    [testCases, startRun],
   )
 
   const startCaseRun = React.useCallback(
     (suiteId: string, caseId: string) => {
       const tc = testCases.find((c) => c.id === caseId)
       if (!tc) return
-      startSuiteRun(suiteId)
+      startRun(suiteId, [tc])
     },
-    [testCases, startSuiteRun],
+    [testCases, startRun],
   )
 
   const value: AppStateContextValue = {
